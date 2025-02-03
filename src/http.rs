@@ -116,19 +116,23 @@ impl HttpClient {
             .as_ref()
             .or(self.api_token.as_ref())
             .expect("API token needs to be set on client construction or per request");
-        let response = builder
+        let mut builder = builder
             .query(query)
             .header(header::AUTHORIZATION, Self::header_from_token(api_token))
-            .timeout(how.client_timeout)
-            .send()
-            .await
-            .map_err(|reqwest_error| {
-                if reqwest_error.is_timeout() {
-                    Error::ClientTimeout(how.client_timeout)
-                } else {
-                    reqwest_error.into()
-                }
-            })?;
+            .timeout(how.client_timeout);
+
+        if let Some(trace_context) = &how.trace_context {
+            builder = builder.header("traceparent", trace_context.traceparent.clone());
+            builder = builder.header("tracestate", trace_context.tracestate.clone());
+        }
+
+        let response = builder.send().await.map_err(|reqwest_error| {
+            if reqwest_error.is_timeout() {
+                Error::ClientTimeout(how.client_timeout)
+            } else {
+                reqwest_error.into()
+            }
+        })?;
         translate_http_error(response).await
     }
 

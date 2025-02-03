@@ -4,7 +4,7 @@ use aleph_alpha_client::{
     cosine_similarity, Client, CompletionEvent, Granularity, How, ImageScore, ItemExplanation,
     Message, Modality, Prompt, PromptGranularity, Sampling, SemanticRepresentation, Stopping, Task,
     TaskBatchSemanticEmbedding, TaskChat, TaskCompletion, TaskDetokenization, TaskExplanation,
-    TaskSemanticEmbedding, TaskTokenization, TextScore,
+    TaskSemanticEmbedding, TaskTokenization, TextScore, TraceContext,
 };
 use dotenvy::dotenv;
 use futures_util::StreamExt;
@@ -645,4 +645,33 @@ async fn stream_chat_with_pharia_1_llm_7b() {
     assert!(events.len() >= 2);
     assert_eq!(events[0].delta.role.as_ref().unwrap(), "assistant");
     assert_eq!(events[1].delta.role, None);
+}
+
+#[tokio::test]
+async fn trace_context_is_propagated() {
+    // Given a client with a trace context
+    let client = Client::with_auth(inference_url(), pharia_ai_token()).unwrap();
+    let trace_context = TraceContext::new(
+        "00-12345678901234567890123456789012-1234567890123456",
+        "key1=value1,key2=value2",
+    );
+
+    // When the client is used to make a request
+    let task = TaskCompletion::from_text("Hello, World!");
+
+    // Then the completion succeeds
+    let response = client
+        .completion(
+            &task,
+            "pharia-1-llm-7b-control",
+            &How {
+                trace_context: Some(trace_context),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    // Then the response is non-empty
+    assert!(!response.completion.is_empty());
 }

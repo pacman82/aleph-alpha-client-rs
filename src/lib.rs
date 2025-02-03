@@ -448,6 +448,34 @@ pub struct How {
     /// API token used to authenticate the request, overwrites the default token provided on setup
     /// Default token may not provide the tracking or permission that is wanted for the request
     pub api_token: Option<String>,
+
+    /// Optionally pass a trace context to propagate tracing information through distributed systems.
+    pub trace_context: Option<TraceContext>,
+}
+
+/// Trace context that is propagated through HTTP headers to enable distributed tracing.
+///
+/// Compliant with https://www.w3.org/TR/trace-context-2/#design-overview, which standardizes how
+/// context information is sent and modified between services.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct TraceContext {
+    /// traceparent describes the position of the incoming request in its trace graph in a portable,
+    /// fixed-length format. Its design focuses on fast parsing. Every tracing tool MUST properly set
+    /// traceparent even when it only relies on vendor-specific information in tracestate
+    pub traceparent: String,
+
+    /// tracestate extends traceparent with vendor-specific data represented by a set of name/value
+    /// pairs. Storing information in tracestate is optional.
+    pub tracestate: String,
+}
+
+impl TraceContext {
+    pub fn new(traceparent: impl Into<String>, tracestate: impl Into<String>) -> Self {
+        Self {
+            traceparent: traceparent.into(),
+            tracestate: tracestate.into(),
+        }
+    }
 }
 
 impl Default for How {
@@ -460,6 +488,7 @@ impl Default for How {
             // therefore by default we wait slightly longer
             client_timeout: api_timeout + Duration::from_secs(5),
             api_token: None,
+            trace_context: None,
         }
     }
 }
